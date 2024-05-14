@@ -1,8 +1,9 @@
 [tool.poetry]
 name = "skinny-orm"
-version = "0.1.2"
+version = "0.2.0"
 description = ""
 authors = ["Mayas Nova"]
+maintainers = ["ZephyrOff"]
 readme = "README.md"
 packages = [{include = "skinny_orm"}]
 

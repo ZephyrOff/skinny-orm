@@ -32,6 +32,22 @@ class User:
 
 ```
 
+When defining the model, it is possible to declare an auto-increment variable with the following method
+```python
+from dataclasses import dataclass
+from datetime import datetime
+from skinny_orm.sqlite_orm import auto_increment
+
+@dataclass
+class User:
+    id: auto_increment = field(init = None, default=None)
+    name: str
+    age: int
+    birth: datetime
+    percentage: float
+
+```
+
 - Create a connection et an "orm" object
 
 ```python
@@ -41,6 +57,23 @@ from skinny_orm.orm import Orm
 connection = sqlite3.connect('database.db')
 orm = Orm(connection)
 ```
+
+- Or only an "orm" object with the name of database
+```python
+from skinny_orm.orm import Orm
+
+orm = Orm('database.db')
+```
+connection_type option is available to specify the connector. (Default sqlite3 since it is the only one currently implemented)
+
+You can also use the with method
+```python
+from skinny_orm.orm import Orm
+
+with Orm('database.db') as orm:
+    orm.bulk_insert(users)
+```
+
 
 - And Voila (no need to create tables. if they don't exist, it will create them automatically)
 

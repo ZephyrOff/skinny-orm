@@ -7,12 +7,16 @@ from skinny_orm.base_orm import BaseOrm
 from skinny_orm.exceptions import ParseError, NotValidComparator, NotValidEntity
 
 
+auto_increment = 'orm_autoincrement'
+
+
 class SqliteOrm(BaseOrm):
     PYTHON_TYPES_TO_SQLITE_MAPPING = {
         int: 'INTEGER',
         str: 'TEXT',
         float: 'REAL',
         datetime: 'TEXT',
+        auto_increment: 'INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT',
     }
 
     def __init__(self, connection, create_tables_if_not_exists=True, parse_fields=True):
@@ -28,6 +32,12 @@ class SqliteOrm(BaseOrm):
         self.parse_fields = parse_fields
         self.create_tables_if_not_exists = create_tables_if_not_exists
         self.update_instances = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.connection.close()
 
     def select(self, entity) -> BaseOrm:
         self._re_init()
@@ -119,6 +129,10 @@ class SqliteOrm(BaseOrm):
 
     def bulk_insert(self, instances, commit=True):
         self._re_init()
+
+        if not isinstance(instances, list):
+            instances = [instances]
+
         if len(instances) == 0:
             return
 
@@ -235,8 +249,9 @@ class SqliteOrm(BaseOrm):
         fields = []
         question_marks = []
         for field_name, field_inst in self._dataclass_fields(instance).items():
-            fields.append(field_name)
-            question_marks.append('?')
+            if field_inst.type!=auto_increment:
+                fields.append(field_name)
+                question_marks.append('?')
         joined_fields = ', '.join(fields)
         joined_question_marks = ', '.join(question_marks)
         query = f"INSERT INTO {instance.__class__.__name__} ({joined_fields}) VALUES ({joined_question_marks})"
@@ -245,7 +260,8 @@ class SqliteOrm(BaseOrm):
     def _get_current_params_for_instance(self, instance) -> list:
         cur_params = []
         for field_name, field_inst in self._dataclass_fields(instance).items():
-            cur_params.append(getattr(instance, field_name))
+            if field_inst.type!=auto_increment:
+                cur_params.append(getattr(instance, field_name))
         return cur_params
 
     def _create_class_fields(self, entity):
@@ -281,6 +297,7 @@ class SqliteOrm(BaseOrm):
         params = ', '.join([f"{field_name}   {self.PYTHON_TYPES_TO_SQLITE_MAPPING[field.type]}"
                             for field_name, field in self._dataclass_fields(entity).items()])
         q = f"""CREATE TABLE "{entity.__name__}"({params});"""
+
         cursor.execute(q)
 
     @staticmethod
