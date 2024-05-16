@@ -5,9 +5,10 @@ from datetime import datetime
 from skinny_orm.base_field import BaseField
 from skinny_orm.base_orm import BaseOrm
 from skinny_orm.exceptions import ParseError, NotValidComparator, NotValidEntity
+import typing
 
-
-auto_increment = 'orm_autoincrement'
+class auto_increment:
+    pass
 
 
 class SqliteOrm(BaseOrm):
@@ -16,7 +17,7 @@ class SqliteOrm(BaseOrm):
         str: 'TEXT',
         float: 'REAL',
         datetime: 'TEXT',
-        auto_increment: 'INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT',
+        typing.Optional[auto_increment]: 'INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT',
     }
 
     def __init__(self, connection, create_tables_if_not_exists=True, parse_fields=True):
@@ -41,7 +42,8 @@ class SqliteOrm(BaseOrm):
 
     def select(self, entity) -> BaseOrm:
         self._re_init()
-        self.current_entity = entity
+        #self.current_entity = entity
+        self.current_entity = self._change_id_type(entity)
         self.current_query = self._generate_select_query(entity)
         self._create_class_fields(entity)
         return self
@@ -96,6 +98,7 @@ class SqliteOrm(BaseOrm):
             if res is None:
                 return None
             cursor.close()
+
             return self.current_entity(*self._parse_and_get_new_tuple(res))
         except sqlite3.OperationalError as e:
             if self.create_tables_if_not_exists and 'no such table' in str(e):
@@ -249,7 +252,7 @@ class SqliteOrm(BaseOrm):
         fields = []
         question_marks = []
         for field_name, field_inst in self._dataclass_fields(instance).items():
-            if field_inst.type!=auto_increment:
+            if field_inst.type!=typing.Optional[auto_increment]:
                 fields.append(field_name)
                 question_marks.append('?')
         joined_fields = ', '.join(fields)
@@ -260,7 +263,7 @@ class SqliteOrm(BaseOrm):
     def _get_current_params_for_instance(self, instance) -> list:
         cur_params = []
         for field_name, field_inst in self._dataclass_fields(instance).items():
-            if field_inst.type!=auto_increment:
+            if field_inst.type!=typing.Optional[auto_increment]:
                 cur_params.append(getattr(instance, field_name))
         return cur_params
 
@@ -273,6 +276,8 @@ class SqliteOrm(BaseOrm):
             return tuple_obj
         res = []
         for index, (field_name, field) in enumerate(self._dataclass_fields(self.current_entity).items()):
+            if field.type==typing.Optional[auto_increment]:
+                field.type = int
             try:
                 if field.type == datetime:
                     res.append(dateparser.parse(tuple_obj[index]))
@@ -294,6 +299,7 @@ class SqliteOrm(BaseOrm):
         self.update_instances = []
 
     def _create_table(self, entity, cursor):
+        entity = self._change_id_type(entity)
         params = ', '.join([f"{field_name}   {self.PYTHON_TYPES_TO_SQLITE_MAPPING[field.type]}"
                             for field_name, field in self._dataclass_fields(entity).items()])
         q = f"""CREATE TABLE "{entity.__name__}"({params});"""
@@ -303,3 +309,13 @@ class SqliteOrm(BaseOrm):
     @staticmethod
     def _dataclass_fields(entity_or_instance):
         return {key: val for key, val in entity_or_instance.__dataclass_fields__.items()}
+
+    def _change_id_type(self, entity):
+        if entity:
+            old_type = typing.Optional[auto_increment]
+            new_type = int
+
+            for field_name, field_type in entity.__annotations__.items():
+                if field_type == old_type:
+                    entity.__annotations__[field_name] = new_type
+        return entity
