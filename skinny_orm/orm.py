@@ -3,7 +3,7 @@ import sqlite3
 
 
 class Orm:
-    def __new__(self, connection, create_tables_if_not_exists=True, parse_fields=True, connection_type="sqlite3"):
+    def __new__(cls, connection, create_tables_if_not_exists=True, parse_fields=True, connection_type="sqlite3"):
         if isinstance(connection, str):
             if connection_type=="sqlite3":
                 connection = sqlite3.connect(connection)
