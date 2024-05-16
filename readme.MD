@@ -33,18 +33,20 @@ class User:
 ```
 
 When defining the model, it is possible to declare an auto-increment variable with the following method
+(Auto-increments must be declared at the end of the model because they are optional)
 ```python
 from dataclasses import dataclass
 from datetime import datetime
 from skinny_orm.sqlite_orm import auto_increment
+from typing import Optional
 
 @dataclass
 class User:
-    id: auto_increment = field(init = None, default=None)
     name: str
     age: int
     birth: datetime
     percentage: float
+    id: Optional[auto_increment] = None
 
 ```
 
