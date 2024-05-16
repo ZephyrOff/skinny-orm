@@ -6,7 +6,8 @@ from typing import List
 
 from skinny_orm.exceptions import ParseError, NotValidComparator, NotValidEntity
 from skinny_orm.orm import Orm
-
+from skinny_orm.sqlite_orm import auto_increment
+from typing import Optional
 
 @dataclass
 class User:
@@ -19,6 +20,15 @@ class User:
     @property
     def misterify_name(self):
         return "Mr. " + self.name
+
+
+@dataclass
+class User_auto_increment:
+    name: str
+    age: int
+    birth: datetime
+    percentage: float
+    id: Optional[auto_increment] = None
 
 
 @dataclass
@@ -53,6 +63,7 @@ class TestSkinnyOrm(unittest.TestCase):
         ]
         self.goku = User(id=9001, name='Goku', age=45, birth=datetime.now(), percentage=0.99)
         self.bra = User(id=50, name='Bra', age=3, birth=datetime.now(), percentage=0.99)
+
 
     def test_simple_insert(self):
         orm.insert(self.goku)
@@ -251,3 +262,38 @@ class TestSkinnyOrm(unittest.TestCase):
 
         test = orm.select(TestTable).all()
         self.assertEqual(test, [])
+
+    def test_readme_example_auto_increment(self):
+        users = [
+            User_auto_increment(name='Naruto', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99),
+            User_auto_increment(name='Sasuke', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.89),
+            User_auto_increment(name='Sakura', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.79),
+        ]
+        orm.bulk_insert(users)
+        naruto: User_auto_increment = orm.select(User_auto_increment).where(User_auto_increment.name == 'Naruto').first()
+        the_boys: list[User_auto_increment] = orm.select(User_auto_increment).where((User_auto_increment.name == 'Naruto') | (User_auto_increment.name == 'Sasuke')).all()
+
+        users_test = User_auto_increment(id=1, name='Naruto', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99)
+        users_test_all = [
+            User_auto_increment(id=1, name='Naruto', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99),
+            User_auto_increment(id=2, name='Sasuke', age=15, birth=datetime(2020, 1, 1, 0, 0), percentage=9.89)
+        ]
+        self.assertEqual(naruto, users_test)
+        self.assertEqual(the_boys, users_test_all)
+
+        orm.update(User_auto_increment).set(User_auto_increment.age == 30).where(User_auto_increment.id == 1)
+        self.assertEqual(orm.select(User_auto_increment).where(User_auto_increment.id == 1).first(),
+                         User_auto_increment(id=1, name='Naruto', age=30, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99))
+        naruto.age = 31
+        orm.update(naruto).using(User_auto_increment.id)
+        self.assertEqual(orm.select(User_auto_increment).where(User_auto_increment.id == 1).first(),
+                         User_auto_increment(id=1, name='Naruto', age=31, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99))
+
+        users_20_year_later = [
+            User_auto_increment(id=1, name='Naruto', age=35, birth=datetime(2020, 1, 1, 0, 0), percentage=9.99),
+            User_auto_increment(id=2, name='Sasuke', age=35, birth=datetime(2020, 1, 1, 0, 0), percentage=9.89),
+            User_auto_increment(id=3, name='Sakura', age=35, birth=datetime(2020, 1, 1, 0, 0), percentage=9.79),
+        ]
+
+        orm.bulk_update(users_20_year_later).using(User_auto_increment.id)
+        self.assertEqual(orm.select(User_auto_increment).all(), users_20_year_later)
